@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { AppController } from './app.controller';        // ← add
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import { UsersModule } from './modules/users/users.module';
@@ -11,17 +12,12 @@ import { AppointmentsModule } from './modules/appointments/appointments.module';
 
 @Module({
   imports: [
-    // Config — global, loads .env
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, databaseConfig],
       envFilePath: '.env',
     }),
-
-    // Rate limiting — 100 requests per 60 seconds
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
-
-    // Database
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -36,11 +32,11 @@ import { AppointmentsModule } from './modules/appointments/appointments.module';
         logging: config.get('app.nodeEnv') === 'development',
       }),
     }),
-
     UsersModule,
     AuthModule,
     PatientsModule,
     AppointmentsModule,
   ],
+  controllers: [AppController],                          // ← add
 })
 export class AppModule {}
