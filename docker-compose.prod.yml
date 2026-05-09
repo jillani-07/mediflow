@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+
+  backend:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mediflow/backend:${IMAGE_TAG:-latest}
+    container_name: mediflow_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV:    production
+      PORT:        3001
+      DB_HOST:     ${DB_HOST}
+      DB_PORT:     5432
+      DB_NAME:     mediflow_db
+      DB_USER:     mediflow_user
+      DB_PASSWORD: ${DB_PASSWORD}
+      APP_SECRET:  ${APP_SECRET}
+    ports:
+      - '3001:3001'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3001/api/v1/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mediflow/frontend:${IMAGE_TAG:-latest}
+    container_name: mediflow_frontend
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    depends_on:
+      - backend
