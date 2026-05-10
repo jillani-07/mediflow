@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { AppController } from './app.controller';
+import { AppController } from './app.controller';        // ← add
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import { UsersModule } from './modules/users/users.module';
@@ -30,9 +30,6 @@ import { AppointmentsModule } from './modules/appointments/appointments.module';
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: config.get('app.nodeEnv') !== 'production',
         logging: config.get('app.nodeEnv') === 'development',
-        ssl: config.get('app.nodeEnv') === 'production'
-          ? { rejectUnauthorized: false }
-          : false,
       }),
     }),
     UsersModule,
@@ -40,6 +37,6 @@ import { AppointmentsModule } from './modules/appointments/appointments.module';
     PatientsModule,
     AppointmentsModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController],                          // ← add
 })
 export class AppModule {}
