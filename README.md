@@ -119,7 +119,7 @@ Result — production image is ~180MB vs ~900MB full image.
 ## Local Development
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/mediflow.git
+git clone https://github.com/jillani-07/mediflow.git
 cd mediflow
 
 cp backend/.env.example backend/.env
