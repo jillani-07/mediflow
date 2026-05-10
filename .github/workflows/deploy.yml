@@ -99,12 +99,12 @@ jobs:
         run: |
           docker build \
             --target production \
+            --build-arg REACT_APP_API_URL=http://mediflow-alb-669746895.ap-south-1.elb.amazonaws.com/api/v1 \
             --tag $ECR_FRONTEND:${{ steps.meta.outputs.tag }} \
             --tag $ECR_FRONTEND:latest \
             .
           docker push $ECR_FRONTEND:${{ steps.meta.outputs.tag }}
           docker push $ECR_FRONTEND:latest
-
       - name: Scan backend image for vulnerabilities
         run: |
           aws ecr wait image-scan-complete \
