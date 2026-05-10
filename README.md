@@ -16,4 +16,4 @@ Cloud & DevOps engineering — CI/CD, IaC, containerization, and AWS deployment.
 4. Run `docker-compose up`
 
 ## Architecture
-See `/docs/architecture.md` (coming soon)
+See `/docs/architecture.md` (coming soon)## Live

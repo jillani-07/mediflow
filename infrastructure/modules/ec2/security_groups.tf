@@ -1,8 +1,7 @@
 # ── ALB Security Group ────────────────────────────────────
-# Allows HTTP/HTTPS from internet
 resource "aws_security_group" "alb" {
   name        = "${var.project}-alb-sg"
-  description = "ALB — allow HTTP and HTTPS from internet"
+  description = "ALB - allow HTTP and HTTPS from internet"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -32,10 +31,9 @@ resource "aws_security_group" "alb" {
 }
 
 # ── EC2 Security Group ────────────────────────────────────
-# Only accepts traffic FROM ALB — not directly from internet
 resource "aws_security_group" "ec2" {
   name        = "${var.project}-ec2-sg"
-  description = "EC2 — allow traffic from ALB only"
+  description = "EC2 - allow traffic from ALB only"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -55,11 +53,11 @@ resource "aws_security_group" "ec2" {
   }
 
   ingress {
-    description = "SSH — restrict to your IP only"
+    description = "SSH - restrict to your IP only"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["${var.allowed_ssh_cidr}"]   # your IP — not 0.0.0.0/0
+    cidr_blocks = ["${var.allowed_ssh_cidr}"]
   }
 
   egress {
@@ -73,10 +71,9 @@ resource "aws_security_group" "ec2" {
 }
 
 # ── RDS Security Group ────────────────────────────────────
-# Only accepts traffic FROM EC2 — never from internet
 resource "aws_security_group" "rds" {
   name        = "${var.project}-rds-sg"
-  description = "RDS — allow PostgreSQL from EC2 only"
+  description = "RDS - allow PostgreSQL from EC2 only"
   vpc_id      = var.vpc_id
 
   ingress {
