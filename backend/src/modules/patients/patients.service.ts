@@ -22,7 +22,12 @@ export class PatientsService {
     if (existing) throw new ConflictException('Patient email already registered');
 
     const patient = this.patientsRepository.create({ ...dto, createdBy });
-    return this.patientsRepository.save(patient);
+    const saved = await this.patientsRepository.save(patient);
+
+    if (saved.createdBy) {
+      delete (saved.createdBy as any).password;
+    }
+    return saved;
   }
 
   async findAll(page = 1, limit = 10): Promise<{ data: Patient[]; total: number }> {
@@ -33,6 +38,11 @@ export class PatientsService {
       take: limit,
       relations: ['createdBy'],
     });
+
+    data.forEach((p) => {
+      if (p.createdBy) delete (p.createdBy as any).password;
+    });
+
     return { data, total };
   }
 
@@ -42,18 +52,27 @@ export class PatientsService {
       relations: ['createdBy'],
     });
     if (!patient) throw new NotFoundException(`Patient ${id} not found`);
+
+    if (patient.createdBy) {
+      delete (patient.createdBy as any).password;
+    }
     return patient;
   }
 
   async update(id: string, dto: UpdatePatientDto): Promise<Patient> {
     const patient = await this.findOne(id);
     Object.assign(patient, dto);
-    return this.patientsRepository.save(patient);
+    const saved = await this.patientsRepository.save(patient);
+
+    if (saved.createdBy) {
+      delete (saved.createdBy as any).password;
+    }
+    return saved;
   }
 
   async remove(id: string): Promise<{ message: string }> {
     const patient = await this.findOne(id);
-    patient.isActive = false;                    // soft delete
+    patient.isActive = false;
     await this.patientsRepository.save(patient);
     return { message: `Patient ${id} deactivated` };
   }
