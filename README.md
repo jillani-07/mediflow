@@ -9,13 +9,6 @@ MediFlow is a Healthtech platform engineered to reflect real-world Cloud & DevOp
 
 ## Live Demo
 
-**URL:** http://mediflow-alb-669746895.ap-south-1.elb.amazonaws.com
-
-| Credential | Value |
-|---|---|
-| Email | admin@mediflow.com |
-| Password | Admin1234 |
-
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ---
