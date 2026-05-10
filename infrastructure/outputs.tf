@@ -13,3 +13,8 @@ output "s3_bucket" {
   description = "S3 bucket name"
   value       = module.s3.bucket_name
 }
+
+output "alb_dns_name" {
+  description = "ALB DNS — open this in browser"
+  value       = module.alb.alb_dns_name
+}

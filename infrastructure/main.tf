@@ -40,3 +40,13 @@ module "s3" {
 data "http" "my_ip" {
   url = "https://checkip.amazonaws.com"
 }
+
+module "alb" {
+  source = "./modules/alb"
+
+  project           = var.project
+  vpc_id            = module.vpc.vpc_id
+  alb_sg_id         = module.ec2.alb_sg_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+  instance_id       = module.ec2.instance_id
+}
