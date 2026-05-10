@@ -1,15 +1,17 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Users, Calendar, CheckCircle, Clock } from 'lucide-react';
+import { Users, CheckCircle, Clock } from 'lucide-react';
 import { patientsApi } from '../../api/patients.api';
 import { appointmentsApi } from '../../api/appointments.api';
 import { AppointmentStatus } from '../../types';
 
 const StatCard = ({
-  label, value, icon: Icon, color
+  label, value, icon: Icon, color,
 }: {
-  label: string; value: number | string;
-  icon: React.ElementType; color: string;
+  label: string;
+  value: number | string;
+  icon: React.ElementType;
+  color: string;
 }) => (
   <div className="bg-white rounded-xl border border-gray-200 p-6 flex items-center gap-4">
     <div className={`p-3 rounded-lg ${color}`}>
@@ -42,9 +44,24 @@ export const DashboardPage: React.FC = () => {
     <div>
       <h2 className="text-xl font-semibold text-gray-900 mb-6">Dashboard</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <StatCard label="Total Patients"        value={patients?.total ?? '—'}   icon={Users}        color="bg-primary-600" />
-        <StatCard label="Scheduled Today"       value={scheduled?.total ?? '—'}  icon={Clock}        color="bg-amber-500"   />
-        <StatCard label="Completed"             value={completed?.total ?? '—'}  icon={CheckCircle}  color="bg-green-500"   />
+        <StatCard
+          label="Total Patients"
+          value={patients?.total ?? '—'}
+          icon={Users}
+          color="bg-primary-600"
+        />
+        <StatCard
+          label="Scheduled"
+          value={scheduled?.total ?? '—'}
+          icon={Clock}
+          color="bg-amber-500"
+        />
+        <StatCard
+          label="Completed"
+          value={completed?.total ?? '—'}
+          icon={CheckCircle}
+          color="bg-green-500"
+        />
       </div>
     </div>
   );
