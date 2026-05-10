@@ -119,7 +119,7 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    needs: build                        # waits for images to be pushed
+    needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
@@ -133,34 +133,34 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region:            ${{ secrets.AWS_REGION }}
 
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host:     ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key:      ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            # Authenticate Docker with ECR
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-              docker login --username AWS --password-stdin \
-              ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      - name: Install SSM plugin
+        run: |
+          curl --silent --location \
+            "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
+            -o session-manager-plugin.deb
+          sudo dpkg -i session-manager-plugin.deb
 
-            # Pull latest images
-            docker pull ${{ env.ECR_BACKEND }}:latest
-            docker pull ${{ env.ECR_FRONTEND }}:latest
+      - name: Deploy via SSM
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=mediflow-app-server" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
 
-            # Navigate to app directory
-            cd /home/ec2-user/mediflow
+          echo "Deploying to instance: $INSTANCE_ID"
 
-            # Update image tags in compose file and restart
-            export IMAGE_TAG=latest
-            export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
-            export AWS_REGION=${{ secrets.AWS_REGION }}
-
-            docker-compose -f docker-compose.prod.yml pull
-            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
-
-            # Cleanup old images
-            docker image prune -f
-
-            echo "Deployment complete — $(date)"
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands='[
+              "aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com",
+              "docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mediflow/backend:latest",
+              "docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mediflow/frontend:latest",
+              "cd /home/ec2-user/mediflow && export IMAGE_TAG=latest && export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }} && export AWS_REGION=${{ secrets.AWS_REGION }} && docker-compose -f docker-compose.prod.yml up -d --remove-orphans",
+              "docker image prune -f",
+              "echo Deployment complete"
+            ]' \
+            --comment "Deploy from GitHub Actions ${{ github.sha }}" \
+            --output text \
+            --query "Command.CommandId"

@@ -52,14 +52,6 @@ resource "aws_security_group" "ec2" {
     security_groups = [aws_security_group.alb.id]
   }
 
-  ingress {
-    description = "SSH - restrict to your IP only"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["${var.allowed_ssh_cidr}"]
-  }
-
   egress {
     from_port   = 0
     to_port     = 0
@@ -69,7 +61,6 @@ resource "aws_security_group" "ec2" {
 
   tags = { Name = "${var.project}-ec2-sg" }
 }
-
 # ── RDS Security Group ────────────────────────────────────
 resource "aws_security_group" "rds" {
   name        = "${var.project}-rds-sg"

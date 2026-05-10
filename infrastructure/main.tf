@@ -16,8 +16,6 @@ module "ec2" {
   public_subnet_id  = module.vpc.public_subnet_ids[0]
   ec2_instance_type = var.ec2_instance_type
   s3_bucket_name    = var.s3_bucket_name
-  key_pair_name     = var.project
-  allowed_ssh_cidr  = "${chomp(data.http.my_ip.response_body)}/32"
 }
 
 module "rds" {

@@ -15,7 +15,6 @@ data "aws_ami" "amazon_linux" {
 }
 
 # ── IAM Role for EC2 ──────────────────────────────────────
-# Least privilege — only S3 access to mediflow bucket
 resource "aws_iam_role" "ec2_role" {
   name = "${var.project}-ec2-role"
 
@@ -30,7 +29,7 @@ resource "aws_iam_role" "ec2_role" {
 }
 
 resource "aws_iam_role_policy" "ec2_s3_policy" {
-  name = "${var.project}-ec2-s3-policy"
+  name = "${var.project}-ec2-policy"
   role = aws_iam_role.ec2_role.id
 
   policy = jsonencode({
@@ -52,10 +51,25 @@ resource "aws_iam_role_policy" "ec2_s3_policy" {
       },
       {
         Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ]
+        Action = ["secretsmanager:GetSecretValue"]
         Resource = "arn:aws:secretsmanager:${var.aws_region}:*:secret:mediflow/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:UpdateInstanceInformation",
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel",
+          "ec2messages:AcknowledgeMessage",
+          "ec2messages:DeleteMessage",
+          "ec2messages:FailMessage",
+          "ec2messages:GetEndpoint",
+          "ec2messages:GetMessages",
+          "ec2messages:SendReply"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -73,28 +87,30 @@ resource "aws_instance" "app" {
   subnet_id              = var.public_subnet_id
   vpc_security_group_ids = [aws_security_group.ec2.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
-  key_name               = var.key_pair_name
 
   root_block_device {
     volume_size = 20
     volume_type = "gp3"
-    encrypted   = true                  # EBS encryption — security must
+    encrypted   = true
   }
 
-  # Startup script — installs Docker on first boot
   user_data = base64encode(<<-EOF
     #!/bin/bash
     set -e
     dnf update -y
-    dnf install -y docker git
+    dnf install -y docker git amazon-ssm-agent
     systemctl enable docker
     systemctl start docker
+    systemctl enable amazon-ssm-agent
+    systemctl start amazon-ssm-agent
     usermod -aG docker ec2-user
 
-    # Docker Compose
     curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
       -o /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
+
+    mkdir -p /home/ec2-user/mediflow
+    chown ec2-user:ec2-user /home/ec2-user/mediflow
   EOF
   )
 
