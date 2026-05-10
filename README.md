@@ -1,103 +1,40 @@
 # MediFlow 🏥
 
-MediFlow is a Healthtech platform engineered to reflect real-world Cloud & DevOps practices — covering infrastructure provisioning, containerization, automated deployment pipelines, security hardening, and production monitoring.
+MediFlow is a Healthtech platform engineered to reflect real-world Cloud & DevOps practices — infrastructure provisioning, containerization, automated deployment, security hardening, and monitoring.
 
-> **Focus:** Cloud & DevOps (AWS + Docker + Terraform + GitHub Actions)
-> **Status:** Live on AWS — actively adding features
-
-**Live:** http://mediflow-alb-669746895.ap-south-1.elb.amazonaws.com
+> **Focus:** Cloud & DevOps — AWS · Docker · Terraform · GitHub Actions  
+> **Status:** Live on AWS · Actively adding features
 
 ---
 
-## Architecture Overview
-Browser
-↓
-ALB (Application Load Balancer)
-├── /* → Frontend container (React + Nginx) → port 80
-└── /api/* → Backend container (NestJS) → port 3001
-↓
-RDS PostgreSQL (private subnet — no internet access)
-S3 (encrypted file storage)
-Secrets Manager (runtime credentials)
+## Live Demo
+
+**URL:** http://mediflow-alb-669746895.ap-south-1.elb.amazonaws.com
+
+| Credential | Value |
+|---|---|
+| Email | admin@mediflow.com |
+| Password | Admin1234 |
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ---
 
-## Infrastructure — Terraform (IaC)
+## Architecture
 
-All AWS resources provisioned via Terraform modules — no manual console clicks.
-infrastructure/
-├── modules/
-│   ├── vpc/    → VPC, public/private subnets, IGW, route tables
-│   ├── ec2/    → EC2, IAM role, security groups, user_data bootstrap
-│   ├── rds/    → PostgreSQL, subnet group, encryption
-│   ├── s3/     → Private bucket, AES-256, versioning
-│   └── alb/    → ALB, target groups, listener rules
-**VPC design:**
-- Public subnets — EC2, ALB (internet-facing)
-- Private subnets — RDS (no internet route)
+![Architecture](docs/screenshots/architecture.png)
 
-**Security groups — least privilege:**
-- ALB SG → accepts 80 from internet
-- EC2 SG → accepts traffic from ALB SG only
-- RDS SG → accepts 5432 from EC2 SG only
-
----
-
-## CI/CD Pipeline — GitHub Actions
-git push → main
-↓
-Job 1 — Test
-└── npm build (frontend + backend)
-└── TypeScript type check + lint
-↓ (only if test passes)
-Job 2 — Build & Push
-└── docker build --target production (multi-stage)
-└── push to AWS ECR (tagged with git SHA)
-└── ECR CVE vulnerability scan on push
-↓ (only if build passes)
-Job 3 — Deploy
-└── aws ssm send-command → EC2
-└── docker pull latest from ECR
-└── docker-compose up -d --remove-orphans
-└── docker image prune (cleanup)
-Total pipeline time — ~4 minutes from push to live.
-
----
-
-## Security Implementation
-
-| Decision | Implementation |
-|---|---|
-| No SSH access | AWS SSM Session Manager — port 22 never opened |
-| No hardcoded secrets | AWS Secrets Manager — pulled at runtime |
-| Network isolation | RDS in private subnet — EC2 is only allowed ingress |
-| IAM least privilege | EC2 role allows only S3 + SSM + Secrets Manager |
-| Encrypted storage | EBS gp3 encrypted, RDS storage encrypted, S3 AES-256 |
-| Image security | ECR CVE scan triggered on every push |
-| API protection | Helmet headers, rate limiting (100 req/min), JWT auth |
-
----
-
-## Docker — Multi-stage Builds
-
-```dockerfile
-# Stage 1 — Build (includes dev dependencies)
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# Stage 2 — Production (only runtime, no dev deps)
-FROM node:20-alpine AS production
-COPY --from=builder /app/dist ./dist
-CMD ["node", "dist/main.js"]
 ```
-
-Result — production image is ~180MB vs ~900MB full image.
+Browser
+    ↓
+ALB (Application Load Balancer)
+    ├── /*      → Frontend container (React + Nginx)  :80
+    └── /api/*  → Backend container (NestJS)          :3001
+                        ↓
+                RDS PostgreSQL  (private subnet — no internet access)
+                S3 Bucket       (encrypted file storage)
+                Secrets Manager (runtime credentials)
+```
 
 ---
 
@@ -109,10 +46,75 @@ Result — production image is ~180MB vs ~900MB full image.
 | Backend | NestJS, TypeORM, PostgreSQL |
 | Auth | JWT (8h expiry), bcrypt (12 rounds) |
 | Cloud | AWS — EC2, RDS, S3, ECR, ALB, IAM, SSM, Secrets Manager, CloudWatch |
-| IaC | Terraform — modular, versioned |
-| Containers | Docker, docker-compose |
+| IaC | Terraform — modular |
+| Containers | Docker — multi-stage builds |
 | CI/CD | GitHub Actions |
-| Monitoring | CloudWatch alarms (CPU > 80%), 7-day log retention |
+| Monitoring | CloudWatch — CPU alarms, 7-day log retention |
+
+---
+
+## Infrastructure — Terraform
+
+All AWS resources provisioned via Terraform modules. No manual console clicks.
+
+```
+infrastructure/
+└── modules/
+    ├── vpc/   → VPC, public/private subnets, IGW, route tables
+    ├── ec2/   → EC2, IAM role, security groups, user_data bootstrap
+    ├── rds/   → PostgreSQL 16, private subnet, encrypted storage
+    ├── s3/    → Private bucket, AES-256, versioning enabled
+    └── alb/   → ALB, target groups, listener rules (/api/* routing)
+```
+
+**Network design:**
+- Public subnets — EC2, ALB (internet-facing)
+- Private subnets — RDS (no internet route)
+
+**Security groups — least privilege:**
+- ALB SG → accepts 80 from internet only
+- EC2 SG → accepts traffic from ALB SG only
+- RDS SG → accepts 5432 from EC2 SG only
+
+---
+
+## CI/CD Pipeline — GitHub Actions
+
+```
+git push → main
+    ↓
+Job 1 — Test
+    ├── npm build (frontend + backend)
+    └── TypeScript type check + lint
+    ↓
+Job 2 — Build & Push
+    ├── docker build --target production (multi-stage)
+    ├── push to AWS ECR (tagged with git SHA)
+    └── ECR CVE vulnerability scan on every push
+    ↓
+Job 3 — Deploy
+    ├── aws ssm send-command → EC2 (no SSH, no open ports)
+    ├── docker pull latest from ECR
+    └── docker-compose up -d --remove-orphans
+
+Total: ~4 minutes from push to live
+```
+
+![Pipeline](docs/screenshots/pipeline.png)
+
+---
+
+## Security
+
+| Decision | Implementation |
+|---|---|
+| No SSH access | AWS SSM Session Manager — port 22 never opened |
+| No hardcoded secrets | AWS Secrets Manager — pulled at runtime |
+| Network isolation | RDS in private subnet — EC2 is only allowed ingress |
+| IAM least privilege | EC2 role scoped to S3 + SSM + Secrets Manager only |
+| Encrypted storage | EBS gp3 encrypted, RDS encrypted, S3 AES-256 |
+| Image security | ECR CVE scan on every push |
+| API protection | Helmet headers, rate limiting (100 req/min), JWT auth |
 
 ---
 
@@ -138,6 +140,8 @@ docker-compose up
 ---
 
 ## Project Structure
+
+```
 mediflow/
 ├── frontend/              # React + TypeScript
 ├── backend/               # NestJS + TypeORM
@@ -149,12 +153,13 @@ mediflow/
 │   └── modules/           # vpc, ec2, rds, s3, alb
 ├── .github/workflows/     # GitHub Actions CI/CD
 └── docker-compose.yml     # Local development
+```
 
 ---
 
 ## Roadmap
 
-- [ ] Patient registration + appointment forms
+- [ ] Patient registration + appointment scheduling forms
 - [ ] HTTPS — ACM certificate with custom domain
 - [ ] Auto Scaling Group — scale EC2 on CPU threshold
 - [ ] S3 file upload — patient document storage
