@@ -1,50 +1,149 @@
 # MediFlow 🏥
 
-Production-grade Healthtech platform built to demonstrate Cloud & DevOps engineering.
+A production-style Healthtech platform built to demonstrate real-world **Cloud & DevOps engineering** — not just code, but the full lifecycle: infrastructure, containerization, CI/CD, security, and monitoring.
 
-## Tech Stack
-- **Frontend** — React + TypeScript + Tailwind CSS
-- **Backend** — NestJS + PostgreSQL (TypeORM)
-- **Cloud** — AWS (EC2, RDS, S3, ECR, IAM, SSM, Secrets Manager, CloudWatch)
-- **DevOps** — Docker, GitHub Actions CI/CD, Terraform (IaC)
+> **Focus:** Cloud & DevOps (AWS + Docker + Terraform + GitHub Actions)  
+> **Status:** Live on AWS — actively adding features
+
+---
+
+## Live Demo
+**URL:** http://mediflow-alb-669746895.ap-south-1.elb.amazonaws.com
+
+**Test credentials:**
+- Email: `admin@mediflow.com`
+- Password: `Admin1234`
+
+---
 
 ## Architecture
-- VPC with public/private subnets
-- EC2 (t3.micro) running Docker containers
-- RDS PostgreSQL in private subnet — no internet access
-- S3 for file storage — private, AES-256 encrypted
-- ECR for Docker image registry — CVE scan on push
-- SSM Session Manager — zero open ports, no SSH
-- Secrets Manager — no plaintext secrets anywhere
-- CloudWatch — CPU alerts, log retention
+User → ALB → EC2 (Docker)
+├── Frontend (React + Nginx)
+└── Backend (NestJS)
+└── RDS PostgreSQL (private subnet)
+└── S3 (file storage)
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+---
+
+## Tech Stack
+
+### Application
+| Layer | Technology |
+|---|---|
+| Frontend | React, TypeScript, Tailwind CSS |
+| Backend | NestJS, TypeScript |
+| Database | PostgreSQL (AWS RDS) |
+| Auth | JWT + bcrypt |
+
+### Cloud & DevOps
+| Area | Technology |
+|---|---|
+| Cloud | AWS (EC2, RDS, S3, ECR, ALB, IAM, SSM, Secrets Manager, CloudWatch) |
+| IaC | Terraform |
+| Containers | Docker, multi-stage builds |
+| CI/CD | GitHub Actions |
+| Monitoring | CloudWatch alarms + log retention |
+
+---
+
+## AWS Infrastructure
+
+VPC (10.0.0.0/16)
+├── Public Subnets  → EC2, ALB
+└── Private Subnets → RDS PostgreSQL
+Security Groups
+├── ALB SG  → accepts 80/443 from internet
+├── EC2 SG  → accepts traffic from ALB only
+└── RDS SG  → accepts 5432 from EC2 only
+
+### Key Security Decisions
+- **No port 22** — EC2 access via AWS SSM only
+- **RDS in private subnet** — never exposed to internet
+- **IAM least privilege** — EC2 role scoped to S3 + SSM + Secrets Manager
+- **Secrets Manager** — no plaintext credentials anywhere
+- **EBS + RDS encrypted** at rest
+- **ECR image scanning** — CVE check on every push
+
+---
 
 ## CI/CD Pipeline
-Every `git push` to `main`:
-1. Test — lint + build both apps
-2. Build — docker build + push to ECR
-3. Deploy — SSM command to EC2, docker-compose up
 
-## Security
-- No port 22 open — SSM only
-- RDS in private subnet — EC2 access only
-- IAM least privilege — EC2 role scoped to S3 + SSM + Secrets
-- EBS encrypted, RDS encrypted at rest
-- ECR image scanning on every push
-- Rate limiting + Helmet on API
+Every `git push` to `main` triggers:
 
-## Local Setup
-1. Clone repo
-2. Copy `.env.example` to `.env` in frontend/ and backend/
-3. Fill values
-4. Run `docker-compose up`
+Test (1m)  →  Build & Push to ECR (3m)  →  Deploy via SSM (30s)
+- **Test** — TypeScript build + lint check
+- **Build** — Multi-stage Docker build, push to AWS ECR with CVE scan
+- **Deploy** — SSM `send-command` to EC2, zero SSH, zero downtime
 
-## Status
-- [x] Phase 1 — Git + Security baseline
-- [x] Phase 2 — NestJS Backend
-- [x] Phase 3 — React Frontend
-- [x] Phase 4 — Docker
-- [x] Phase 5 — Terraform IaC
-- [x] Phase 6 — GitHub Actions CI/CD
-- [x] Phase 7 — AWS Deployment
-- [x] Phase 8 — Secrets Manager
-- [x] Phase 9 — CloudWatch Monitoring
+![Pipeline](docs/screenshots/pipeline.png)
+
+---
+
+## Local Development
+
+### Prerequisites
+- Docker Desktop
+- Node.js 20+
+
+### Setup
+
+```bash
+# Clone
+git clone https://github.com/YOUR_USERNAME/mediflow.git
+cd mediflow
+
+# Backend
+cd backend
+cp .env.example .env
+# fill in values
+npm install
+npm run start:dev
+
+# Frontend
+cd frontend
+cp .env.example .env
+npm install
+npm start
+
+# Or run everything with Docker
+docker-compose up
+```
+
+---
+
+## Project Structure
+mediflow/
+├── frontend/              # React + TypeScript
+├── backend/               # NestJS + TypeORM
+├── infrastructure/        # Terraform (AWS IaC)
+│   └── modules/
+│       ├── vpc/
+│       ├── ec2/
+│       ├── rds/
+│       ├── s3/
+│       └── alb/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml     # CI/CD pipeline
+└── docker-compose.yml     # Local dev
+---
+
+## Roadmap
+- [ ] Patient registration form
+- [ ] Appointment scheduling form
+- [ ] HTTPS with custom domain (ACM)
+- [ ] Auto Scaling Group (ASG)
+- [ ] S3 file upload (patient reports)
+- [ ] CloudWatch dashboard
+
+---
+
+## What I Learned
+- Provisioning production-style AWS infrastructure with Terraform
+- Multi-stage Docker builds for optimized images
+- Zero-trust access — SSM instead of SSH
+- GitHub Actions CI/CD with ECR integration
+- IAM least privilege in practice
+- Debugging real AWS errors (RDS SSL, security groups, ECR auth)
