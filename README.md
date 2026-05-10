@@ -22,7 +22,7 @@ MediFlow is a Healthtech platform engineered to reflect real-world Cloud & DevOp
 
 ## Architecture
 
-![Architecture](docs/screenshots/architecture.png)
+
 
 ```
 Browser
