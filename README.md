@@ -130,7 +130,7 @@ flowchart LR
 
 ---
 
-## Security
+## Security.
 
 ```mermaid
 graph TB
