@@ -1,6 +1,6 @@
 # MediFlow 🏥
 
-> A production-style Healthtech platform engineered to reflect real-world Cloud & DevOps practices — infrastructure provisioning, containerization, automated deployment, security hardening, and monitoring on AWS.
+> AWS-based Cloud & DevOps implementation project focused on infrastructure automation, CI/CD pipelines, containerized deployments, and cloud security best practices.
 
 **Live:** http://mediflow-alb-669746895.ap-south-1.elb.amazonaws.com
 
