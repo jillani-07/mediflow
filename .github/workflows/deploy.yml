@@ -99,7 +99,7 @@ jobs:
         run: |
           docker build \
             --target production \
-            --build-arg REACT_APP_API_URL=http://mediflow-alb-669746895.ap-south-1.elb.amazonaws.com/api/v1 \
+            --build-arg REACT_APP_API_URL=http://mediflow-alb-2134624605.ap-south-1.elb.amazonaws.com/api/v1 \
             --tag $ECR_FRONTEND:${{ steps.meta.outputs.tag }} \
             --tag $ECR_FRONTEND:latest \
             .
