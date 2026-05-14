@@ -169,27 +169,6 @@ graph TB
 - HTTP security headers via Helmet
 - JWT authentication on all protected routes
 
----
-
-## Infrastructure — Terraform
-
-All AWS resources provisioned via Terraform. Zero manual console clicks.
-infrastructure/
-└── modules/
-├── vpc/   → VPC, public/private subnets, IGW, route tables
-├── ec2/   → EC2, IAM role, instance profile, security groups
-├── rds/   → PostgreSQL 16, private subnet, encrypted
-├── s3/    → Private bucket, AES-256, versioning, config store
-└── alb/   → ALB, target groups, /api/* listener rules
-
-**Security group chain — least privilege:**
-Internet → ALB SG (80/443)
-↓
-EC2 SG (from ALB SG only)
-↓
-RDS SG (5432 from EC2 SG only)
----
-
 ## Screenshots
 
 > Login Page
@@ -210,7 +189,7 @@ RDS SG (5432 from EC2 SG only)
 
 > AWS EC2 Console
 
-![EC2](docs/screenshots/ec2-console.png)
+![EC2](docs/screenshots/ec2.png)
 
 ---
 
@@ -268,23 +247,6 @@ aws ssm send-command --instance-id "<INSTANCE_ID>" \
 git commit --allow-empty -m "chore: trigger deployment"
 git push origin main
 ```
-
----
-
-## Project Structure
-mediflow/
-├── frontend/              # React + TypeScript + Tailwind
-├── backend/               # NestJS + TypeORM
-│   └── src/
-│       ├── modules/       # auth, users, patients, appointments
-│       ├── common/        # guards, filters, interceptors
-│       └── config/        # app, database config
-├── infrastructure/        # Terraform
-│   └── modules/           # vpc, ec2, rds, s3, alb
-├── .github/workflows/     # GitHub Actions CI/CD
-├── docker-compose.yml     # Local development
-└── docker-compose.prod.yml # Production — pulled from S3 on deploy
----
 
 ## Roadmap
 
