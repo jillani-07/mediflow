@@ -140,6 +140,10 @@ jobs:
             -o session-manager-plugin.deb
           sudo dpkg -i session-manager-plugin.deb
 
+      - name: Upload compose file to S3
+        run: |
+          aws s3 cp docker-compose.prod.yml s3://mediflow-uploads-prod/config/docker-compose.prod.yml
+
       - name: Deploy via SSM
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
@@ -154,10 +158,12 @@ jobs:
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
+              "mkdir -p /home/ec2-user/mediflow",
+              "aws s3 cp s3://mediflow-uploads-prod/config/docker-compose.prod.yml /home/ec2-user/mediflow/docker-compose.prod.yml",
               "aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com",
               "docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mediflow/backend:latest",
               "docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mediflow/frontend:latest",
-              "cd /home/ec2-user/mediflow && export IMAGE_TAG=latest && export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }} && export AWS_REGION=${{ secrets.AWS_REGION }} && docker-compose -f docker-compose.prod.yml up -d --remove-orphans",
+              "cd /home/ec2-user/mediflow && export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }} && export AWS_REGION=${{ secrets.AWS_REGION }} && docker-compose -f docker-compose.prod.yml up -d --remove-orphans",
               "docker image prune -f",
               "echo Deployment complete"
             ]' \
