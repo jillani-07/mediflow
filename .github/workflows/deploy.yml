@@ -150,22 +150,17 @@ jobs:
 
           echo "Deploying to instance: $INSTANCE_ID"
 
-          # Copy docker-compose.prod.yml content to EC2 via SSM
-          COMPOSE_CONTENT=$(cat docker-compose.prod.yml | base64)
-
           aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands="[
-              \"mkdir -p /home/ec2-user/mediflow\",
-              \"echo $COMPOSE_CONTENT | base64 -d > /home/ec2-user/mediflow/docker-compose.prod.yml\",
-              \"aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com\",
-              \"docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mediflow/backend:latest\",
-              \"docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mediflow/frontend:latest\",
-              \"cd /home/ec2-user/mediflow && export IMAGE_TAG=latest && export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }} && export AWS_REGION=${{ secrets.AWS_REGION }} && docker-compose -f docker-compose.prod.yml up -d --remove-orphans\",
-              \"docker image prune -f\",
-              \"echo Deployment complete\"
-            ]" \
-            --comment "Deploy from GitHub Actions ${{ github.sha }}" \
+            --parameters 'commands=[
+              "aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com",
+              "docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mediflow/backend:latest",
+              "docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mediflow/frontend:latest",
+              "cd /home/ec2-user/mediflow && export IMAGE_TAG=latest && export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }} && export AWS_REGION=${{ secrets.AWS_REGION }} && docker-compose -f docker-compose.prod.yml up -d --remove-orphans",
+              "docker image prune -f",
+              "echo Deployment complete"
+            ]' \
+            --comment "Deploy ${{ github.sha }}" \
             --output text \
             --query "Command.CommandId"
