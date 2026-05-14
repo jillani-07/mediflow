@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mediflow_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mediflow_db
+      POSTGRES_USER: mediflow_user
+      POSTGRES_PASSWORD: mediflow_pass
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mediflow_user -d mediflow_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: mediflow_backend
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      DB_HOST: postgres
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: mediflow_frontend
+    restart: unless-stopped
+    ports:
+      - '3000:80'
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
