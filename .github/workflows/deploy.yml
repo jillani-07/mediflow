@@ -99,7 +99,7 @@ jobs:
         run: |
           docker build \
             --target production \
-            --build-arg REACT_APP_API_URL=http://mediflow-alb-2134624605.ap-south-1.elb.amazonaws.com/api/v1 \
+            --build-arg REACT_APP_API_URL=http://${{ secrets.ALB_DNS }}/api/v1 \
             --tag $ECR_FRONTEND:${{ steps.meta.outputs.tag }} \
             --tag $ECR_FRONTEND:latest \
             .
@@ -133,13 +133,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region:            ${{ secrets.AWS_REGION }}
 
-      - name: Install SSM plugin
-        run: |
-          curl --silent --location \
-            "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
-            -o session-manager-plugin.deb
-          sudo dpkg -i session-manager-plugin.deb
-
       - name: Upload compose file to S3
         run: |
           aws s3 cp docker-compose.prod.yml s3://mediflow-uploads-prod/config/docker-compose.prod.yml
@@ -168,5 +161,30 @@ jobs:
               "echo Deployment complete"
             ]' \
             --comment "Deploy ${{ github.sha }}" \
+            --output text \
+            --query "Command.CommandId"
+
+      - name: Create DB tables if not exist
+        run: |
+          sleep 30
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=mediflow-app-server" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["docker run --rm \
+              -e NODE_ENV=development \
+              -e DB_HOST=$(grep DB_HOST /home/ec2-user/mediflow/.env | cut -d= -f2) \
+              -e DB_PORT=5432 \
+              -e DB_NAME=$(grep DB_NAME /home/ec2-user/mediflow/.env | cut -d= -f2) \
+              -e DB_USER=$(grep DB_USER /home/ec2-user/mediflow/.env | cut -d= -f2) \
+              -e DB_PASSWORD=$(grep DB_PASSWORD /home/ec2-user/mediflow/.env | cut -d= -f2) \
+              -e APP_SECRET=secret \
+              ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mediflow/backend:latest \
+              node -e \"const {DataSource}=require('"'"'typeorm'"'"');new DataSource({type:'"'"'postgres'"'"',host:process.env.DB_HOST,port:5432,username:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME,ssl:{rejectUnauthorized:false},entities:['"'"'/app/dist/**/*.entity.js'"'"'],synchronize:true}).initialize().then(()=>{console.log('"'"'Tables created'"'"');process.exit(0)}).catch(e=>{console.error(e);process.exit(1)})\" || true"]' \
             --output text \
             --query "Command.CommandId"
