@@ -2,8 +2,6 @@
 
 > AWS-based Cloud & DevOps implementation project focused on infrastructure automation, CI/CD pipelines, containerized deployments, and cloud security best practices.
 
-**Live:** http://mediflow-alb-669746895.ap-south-1.elb.amazonaws.com
-
 ![React](https://img.shields.io/badge/React-18-blue?style=flat-square&logo=react)
 ![NestJS](https://img.shields.io/badge/NestJS-10-red?style=flat-square&logo=nestjs)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue?style=flat-square&logo=postgresql)
@@ -16,9 +14,11 @@
 
 ## Overview
 
-MediFlow is a Healthtech platform for managing patients and appointments. The project exists to demonstrate end-to-end Cloud & DevOps ownership — not just writing application code, but provisioning infrastructure as code, securing it properly, and shipping it automatically with every git push.
+MediFlow is a Healthtech platform for managing patients and appointments. Built to demonstrate end-to-end Cloud & DevOps ownership — infrastructure provisioning, containerization, CI/CD automation, and security hardening on AWS.
 
-**Why this project exists:** To prove that real DevOps decisions — network isolation, zero SSH access, secret management, image scanning — can be applied outside a corporate environment.
+Every architectural decision reflects real-world engineering — private subnets, zero SSH access, secret management, image scanning, and fully automated deployments.
+
+> **Live URL** — changes on each `terraform apply`. Run locally or redeploy using the guide below.
 
 ---
 
@@ -30,7 +30,7 @@ graph TB
 
     subgraph CICD ["DevOps — GitHub"]
         GIT["GitHub Repository"]
-        PIPE["GitHub Actions CI/CD\nTest → Build → Deploy"]
+        PIPE["GitHub Actions CI/CD\nTest → Build → Deploy → DB Sync"]
         TF["Terraform\nInfrastructure as Code"]
     end
 
@@ -56,11 +56,11 @@ graph TB
             SM["Secrets Manager\nDB creds · JWT secret"]
             SSM["SSM Session Manager\nZero open ports"]
             CW["CloudWatch\nCPU Alarms · Logs"]
-            S3["S3 Bucket\nAES-256 · Private"]
+            S3["S3 Bucket\nAES-256 · Private\nConfig store"]
         end
 
         subgraph IAM ["IAM — Least Privilege"]
-            ROLE["EC2 Role\nS3 + SSM + Secrets only"]
+            ROLE["EC2 Role\nS3 + SSM + Secrets + ECR"]
         end
     end
 
@@ -75,6 +75,7 @@ graph TB
 
     GIT -->|git push triggers| PIPE
     PIPE -->|docker push| ECR
+    PIPE -->|s3 cp compose file| S3
     PIPE -->|ssm send-command| EC2
     ECR -->|docker pull| EC2
     TF -->|terraform apply| AWS
@@ -94,15 +95,17 @@ flowchart LR
         TEST["TEST\nnpm build\nlint + type check"] --> BUILD
         BUILD["BUILD\ndocker build\nmulti-stage"] --> PUSH
         PUSH["PUSH\nAWS ECR\nCVE scan"] --> DEPLOY
-        DEPLOY["DEPLOY\nSSM send-command\nzero SSH"]
+        DEPLOY["DEPLOY\nS3 → EC2\nSSM send-command"] --> DBSYNC
+        DBSYNC["DB SYNC\nauto table creation\nfresh deploy safe"]
     end
 
-    DEPLOY -->|live| PROD["AWS EC2\nap-south-1"]
+    DBSYNC -->|live| PROD["AWS EC2\nap-south-1"]
 
     style TEST fill:#4A90D9,color:#fff
     style BUILD fill:#7B68EE,color:#fff
     style PUSH fill:#20B2AA,color:#fff
     style DEPLOY fill:#3CB371,color:#fff
+    style DBSYNC fill:#E8782A,color:#fff
     style PROD fill:#E8782A,color:#fff
 ```
 
@@ -126,11 +129,11 @@ flowchart LR
 | IaC | Terraform — modular | Reproducible, versioned infra |
 | CI/CD | GitHub Actions | Automated test → build → deploy |
 | Monitoring | CloudWatch | CPU alarms, 7-day log retention |
-| File storage | S3 | Private, AES-256, versioned |
+| File storage | S3 | Private, AES-256, versioned, config store |
 
 ---
 
-## Security.
+## Security
 
 ```mermaid
 graph TB
@@ -145,7 +148,7 @@ graph TB
         SM["AWS Secrets Manager\nEncrypted · IAM controlled · Audited"]
         SSM["AWS SSM Session Manager\nZero open ports · Full audit log"]
         PRIV["RDS in private subnet\nNo internet route — EC2 only"]
-        IAM["IAM Least Privilege\nEC2 scoped to S3 + SSM + Secrets"]
+        IAM["IAM Least Privilege\nEC2 scoped to S3 + SSM + Secrets + ECR"]
     end
 
     ENV -->|stored here| SM
@@ -171,27 +174,20 @@ graph TB
 ## Infrastructure — Terraform
 
 All AWS resources provisioned via Terraform. Zero manual console clicks.
-
-```
 infrastructure/
 └── modules/
-    ├── vpc/   → VPC, public/private subnets, IGW, route tables
-    ├── ec2/   → EC2, IAM role, instance profile, security groups
-    ├── rds/   → PostgreSQL 16, private subnet, encrypted
-    ├── s3/    → Private bucket, AES-256, versioning
-    └── alb/   → ALB, target groups, /api/* listener rules
-```
+├── vpc/   → VPC, public/private subnets, IGW, route tables
+├── ec2/   → EC2, IAM role, instance profile, security groups
+├── rds/   → PostgreSQL 16, private subnet, encrypted
+├── s3/    → Private bucket, AES-256, versioning, config store
+└── alb/   → ALB, target groups, /api/* listener rules
 
 **Security group chain — least privilege:**
-
-```
 Internet → ALB SG (80/443)
-               ↓
-           EC2 SG (from ALB SG only)
-               ↓
-           RDS SG (5432 from EC2 SG only)
-```
-
+↓
+EC2 SG (from ALB SG only)
+↓
+RDS SG (5432 from EC2 SG only)
 ---
 
 ## Screenshots
@@ -233,6 +229,8 @@ cp frontend/.env.example frontend/.env
 docker-compose up
 ```
 
+Tables are created automatically on first run (`NODE_ENV=development`).
+
 | Service | URL |
 |---|---|
 | Frontend | http://localhost:3000 |
@@ -241,9 +239,39 @@ docker-compose up
 
 ---
 
-## Project Structure
+## Fresh AWS Deployment Guide
 
+```bash
+# 1. Configure AWS CLI
+aws configure --profile mediflow
+
+# 2. Create ECR repos
+aws ecr create-repository --repository-name mediflow/backend --region ap-south-1 --profile mediflow
+aws ecr create-repository --repository-name mediflow/frontend --region ap-south-1 --profile mediflow
+
+# 3. Provision infrastructure
+cd infrastructure
+export TF_VAR_db_password="YOUR_DB_PASSWORD"
+terraform init && terraform apply
+
+# 4. Create .env on EC2 via SSM
+aws ssm send-command --instance-id "<INSTANCE_ID>" \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=["mkdir -p /home/ec2-user/mediflow && printf \"DB_HOST=<RDS_ENDPOINT>\nDB_PASSWORD=<PASSWORD>\nAPP_SECRET=<SECRET>\nAWS_ACCOUNT_ID=<ACCOUNT_ID>\nAWS_REGION=ap-south-1\n\" > /home/ec2-user/mediflow/.env"]' \
+  --region ap-south-1 --profile mediflow
+
+# 5. Add GitHub Secrets
+# AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+# AWS_ACCOUNT_ID, EC2_HOST, ALB_DNS
+
+# 6. Trigger pipeline
+git commit --allow-empty -m "chore: trigger deployment"
+git push origin main
 ```
+
+---
+
+## Project Structure
 mediflow/
 ├── frontend/              # React + TypeScript + Tailwind
 ├── backend/               # NestJS + TypeORM
@@ -254,13 +282,22 @@ mediflow/
 ├── infrastructure/        # Terraform
 │   └── modules/           # vpc, ec2, rds, s3, alb
 ├── .github/workflows/     # GitHub Actions CI/CD
-└── docker-compose.yml     # Local development
-```
-
+├── docker-compose.yml     # Local development
+└── docker-compose.prod.yml # Production — pulled from S3 on deploy
 ---
 
 ## Roadmap
 
+- [x] Terraform IaC — all AWS resources as code
+- [x] GitHub Actions CI/CD — automated pipeline
+- [x] Docker multi-stage builds
+- [x] Zero SSH — SSM Session Manager
+- [x] RDS in private subnet
+- [x] AWS Secrets Manager
+- [x] CloudWatch monitoring + alarms
+- [x] ALB with path-based routing
+- [x] S3 as config store for docker-compose
+- [x] ECR CVE scanning
 - [ ] Patient registration + appointment scheduling forms
 - [ ] HTTPS — ACM certificate with custom domain
 - [ ] Auto Scaling Group — scale on CPU threshold
